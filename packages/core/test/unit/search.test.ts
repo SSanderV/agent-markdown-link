@@ -55,6 +55,7 @@ afterEach(async () => {
 function fixture(
   root: string,
   searchRoots: readonly string[],
+  memoryPath?: string,
 ): { readonly config: ResolvedConfig; readonly project: ResolvedProject } {
   const workspaceRoot = path.join(root, "workspace");
   const project = {
@@ -70,6 +71,7 @@ function fixture(
     schemaVersion: 1,
     vaultRoot: path.join(root, "vault"),
     inboxPath: "Inbox/Agent Markdown Link",
+    ...(memoryPath === undefined ? {} : { memoryPath }),
     captureMode: "explicit",
     writeMode: "inbox",
     hookPolicy: "observe",
@@ -162,6 +164,45 @@ describe("Markdown search", () => {
     await expect(
       searchMarkdown(config, project, { schemaVersion: 1, query: "reviewed workflow" }),
     ).resolves.toEqual({ schemaVersion: 1, searchedFiles: 0, truncated: false, results: [] });
+  });
+
+  it("recalls shared direct memory when the selected project has no search roots", async () => {
+    const root = await temporaryRoot();
+    const vault = await createVault(root);
+    await writeNote(vault, "Memory/Automatic/decision.md", "A durable global decision.");
+    const { config, project } = fixture(root, [], "Memory/Automatic");
+
+    const result = await searchMarkdown(config, project, {
+      schemaVersion: 1,
+      query: "durable global",
+    });
+    const otherProject = {
+      ...project,
+      projectId: "project-b",
+      workspaceRoots: [path.join(root, "other-workspace")],
+      workspaceRoot: path.join(root, "other-workspace"),
+    } satisfies ResolvedProject;
+
+    expect(result).toMatchObject({ searchedFiles: 1, truncated: false });
+    expect(result.results.map((entry) => entry.relativePath)).toEqual([
+      "Memory/Automatic/decision.md",
+    ]);
+    await expect(
+      searchMarkdown(config, otherProject, { schemaVersion: 1, query: "durable global" }),
+    ).resolves.toMatchObject({
+      results: [{ relativePath: "Memory/Automatic/decision.md" }],
+    });
+  });
+
+  it("counts shared direct memory once when it overlaps a project root", async () => {
+    const root = await temporaryRoot();
+    const vault = await createVault(root);
+    await writeNote(vault, "Memory/Automatic/decision.md", "A durable global decision.");
+    const { config, project } = fixture(root, ["Memory"], "Memory/Automatic");
+
+    await expect(
+      searchMarkdown(config, project, { schemaVersion: 1, query: "durable global" }),
+    ).resolves.toMatchObject({ searchedFiles: 1, truncated: false });
   });
 
   it("ranks a complete phrase above partial terms and ignores non-Markdown files", async () => {

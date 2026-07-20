@@ -49,7 +49,8 @@ function fixture(
     readonly contextFiles?: readonly string[];
     readonly limits?: Partial<ConfigLimits>;
     readonly captureMode?: "disabled" | "explicit";
-    readonly writeMode?: "inbox" | "outbox";
+    readonly writeMode?: "inbox" | "outbox" | "memory";
+    readonly memoryPath?: string;
   } = {},
 ): { readonly config: ResolvedConfig; readonly project: ResolvedProject } {
   const limits = { ...DEFAULT_LIMITS, ...options.limits };
@@ -67,6 +68,7 @@ function fixture(
     schemaVersion: 1,
     vaultRoot: path.join(root, "vault"),
     inboxPath: "Inbox/Agent Markdown Link",
+    ...(options.memoryPath === undefined ? {} : { memoryPath: options.memoryPath }),
     captureMode: options.captureMode ?? "explicit",
     writeMode: options.writeMode ?? "inbox",
     hookPolicy: "observe",
@@ -337,6 +339,41 @@ describe("candidate capture", () => {
       "20260717T123456789Z-11111111-2222-4333-8444-555555555555.md",
     );
     expect(await readdir(config.outboxRoot)).toEqual([result.relativePath]);
+  });
+
+  it("writes immutable direct memory without editing canonical summaries", async () => {
+    const root = await temporaryRoot();
+    const vault = await createVault(root);
+    const memoryPath = "Memory/Automatic";
+    const memoryDirectory = path.join(vault, ...memoryPath.split("/"));
+    await mkdir(memoryDirectory, { recursive: true });
+    await writeFile(path.join(vault, "PROFILE.md"), "Existing summary.", "utf8");
+    const { config, project } = fixture(root, { writeMode: "memory", memoryPath });
+    const request = parseCandidateRequest({
+      ...VALID_REQUEST,
+      rationale: "Why this is durable.",
+      evidence: "Verified locally.",
+    });
+
+    const result = await captureCandidate(config, project, request, FIXED_OPTIONS);
+    const memoryFile = path.join(vault, ...result.relativePath.split("/"));
+    const memory = await readFile(memoryFile, "utf8");
+
+    expect(result.relativePath).toBe(
+      "Memory/Automatic/20260717T123456789Z-11111111-2222-4333-8444-555555555555.md",
+    );
+    expect(memory).toContain("schema: agent-markdown-link/memory");
+    expect(memory).toContain("status: memory");
+    expect(memory).toContain("## Memory\n\nKeep this fact.");
+    expect(memory).toContain("## Rationale\n\nWhy this is durable.");
+    expect(memory).toContain("## Evidence\n\nVerified locally.");
+    expect(memory).not.toContain(root);
+    await expect(readFile(path.join(vault, "PROFILE.md"), "utf8")).resolves.toBe("Existing summary.");
+
+    await expect(captureCandidate(config, project, request, FIXED_OPTIONS)).rejects.toMatchObject({
+      code: "E_ALREADY_EXISTS",
+    });
+    await expect(readFile(memoryFile, "utf8")).resolves.toBe(memory);
   });
 
   it("fails disabled capture before creating a destination", async () => {

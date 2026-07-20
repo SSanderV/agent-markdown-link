@@ -317,7 +317,11 @@ export async function searchMarkdown(
   project: ResolvedProject,
   request: SearchRequestV1,
 ): Promise<SearchResponseV1> {
-  if (project.searchRoots.length === 0) {
+  const searchRoots = [
+    ...project.searchRoots,
+    ...(config.memoryPath === undefined ? [] : [config.memoryPath]),
+  ];
+  if (searchRoots.length === 0) {
     return { schemaVersion: 1, searchedFiles: 0, truncated: false, results: [] };
   }
 
@@ -461,7 +465,7 @@ export async function searchMarkdown(
     await flushPendingFiles();
   }
 
-  for (const searchRoot of project.searchRoots) {
+  for (const searchRoot of searchRoots) {
     if (stopped) break;
     await walk(await resolveExistingDirectory(canonicalVaultRoot, searchRoot));
   }

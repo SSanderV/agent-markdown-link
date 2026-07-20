@@ -5,7 +5,7 @@ import { AgentMarkdownError } from "../errors.js";
 import { ensurePrivateDirectory } from "../fs/safe-path.js";
 import { publishNoReplace } from "../fs/publish.js";
 import { parseCandidateRequest, type CandidateRequestV1 } from "./request.js";
-import { serializeCandidate } from "./serialize.js";
+import { serializeCandidate, serializeMemory } from "./serialize.js";
 
 export async function captureCandidate(
   config: ResolvedConfig,
@@ -22,11 +22,15 @@ export async function captureCandidate(
   const createdAt = (options.now ?? (() => new Date()))().toISOString();
   const timestamp = createdAt.replace(/[-:.]/gu, "");
   const filename = `${timestamp}-${candidateId}.md`;
-  const markdown = serializeCandidate(normalizedRequest, {
+  const metadata = {
     id: candidateId,
     createdAt,
     projectId: project.projectId,
-  });
+  };
+  const markdown =
+    config.writeMode === "memory"
+      ? serializeMemory(normalizedRequest, metadata)
+      : serializeCandidate(normalizedRequest, metadata);
   const bytes = Buffer.from(markdown, "utf8");
   if (bytes.byteLength > config.limits.candidateBytes) {
     throw new AgentMarkdownError("E_SIZE_LIMIT");
@@ -34,7 +38,11 @@ export async function captureCandidate(
 
   let root: string;
   let relativePath: string;
-  if (config.writeMode === "inbox") {
+  if (config.writeMode === "memory") {
+    if (config.memoryPath === undefined) throw new AgentMarkdownError("E_INTERNAL");
+    root = config.vaultRoot;
+    relativePath = `${config.memoryPath}/${filename}`;
+  } else if (config.writeMode === "inbox") {
     root = config.vaultRoot;
     relativePath = `${config.inboxPath}/${filename}`;
   } else {
