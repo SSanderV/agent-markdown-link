@@ -214,6 +214,15 @@ describe("configuration validation and loading", () => {
     expect(resolved.projects[0]?.searchRoots).toEqual([]);
   });
 
+  it("accepts a default project only when it names a configured project", () => {
+    expect(validateConfig({ ...validConfig, defaultProjectId: "project-a" })).toMatchObject({
+      defaultProjectId: "project-a",
+    });
+    expect(() =>
+      validateConfig({ ...validConfig, defaultProjectId: "missing-project" }),
+    ).toThrowError(expect.objectContaining({ code: "E_CONFIG_INVALID" }));
+  });
+
   it("accepts at most sixteen unique portable search roots", () => {
     const searchRoots = Array.from({ length: 16 }, (_value, index) => `Memory/Area-${index}`);
     const resolved = validateConfig({

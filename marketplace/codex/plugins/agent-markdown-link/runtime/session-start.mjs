@@ -6267,6 +6267,7 @@ var STABLE_ERROR_CODES = [
   "E_CONFIG_INVALID",
   "E_CONFIG_VERSION",
   "E_PROJECT_AMBIGUOUS",
+  "E_PROJECT_UNMAPPED",
   "E_PATH_UNSAFE",
   "E_PATH_ESCAPE",
   "E_INPUT_INVALID",
@@ -6285,6 +6286,7 @@ var SAFE_MESSAGES = {
   E_CONFIG_INVALID: "Configuration is invalid.",
   E_CONFIG_VERSION: "Configuration schema version is unsupported.",
   E_PROJECT_AMBIGUOUS: "Project mapping is ambiguous.",
+  E_PROJECT_UNMAPPED: "No project is mapped for this session.",
   E_PATH_UNSAFE: "Path is unsafe.",
   E_PATH_ESCAPE: "Path escapes its configured root.",
   E_INPUT_INVALID: "Input is invalid.",
@@ -6551,6 +6553,12 @@ var config_schema_default = {
     captureMode: { enum: ["disabled", "explicit"] },
     writeMode: { enum: ["outbox", "inbox"] },
     hookPolicy: { enum: ["observe", "warn", "enforce"] },
+    defaultProjectId: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    },
     limits: { $ref: "#/definitions/limits" },
     contextExclusions: {
       type: "array",
@@ -6748,6 +6756,9 @@ function validateConfig(value) {
     projectIds.add(project.projectId);
     return applyProjectDefaults(project, limits, seenRoots);
   });
+  if (config.defaultProjectId !== void 0 && !projectIds.has(config.defaultProjectId)) {
+    invalidConfig();
+  }
   return {
     ...config,
     vaultRoot: normalizeAbsoluteLocalPath(config.vaultRoot),

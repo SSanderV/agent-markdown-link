@@ -211,7 +211,7 @@ it("uses the minimal valid Codex manifest", async () => {
 
   expect(manifest).toMatchObject({
     name: "agent-markdown-link",
-    version: "0.2.1",
+    version: "0.2.2",
     license: "Apache-2.0",
     skills: "./skills/",
   });
@@ -227,6 +227,6 @@ it("uses the minimal Claude manifest", async () => {
 
   expect(manifest).toMatchObject({
     name: "agent-markdown-link",
-    version: "0.2.1",
+    version: "0.2.2",
   });
 });

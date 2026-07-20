@@ -32,6 +32,8 @@ Linux:   ~/.config/agent-markdown-link/config.json
 
 The configuration selects a vault root, an Inbox for candidate notes, and project mappings. Each mapping supplies workspace roots, ordered context files, and optional search roots. No fixed vault layout is required.
 
+Claude Desktop Cowork may report a workspace path that cannot match a host mapping. To give such sessions the same configured vault, set the optional top-level `defaultProjectId` to one existing project ID. Exact workspace matches still win. Without this explicit setting, unmapped sessions fail closed. Because every unmapped Claude MCP session can then use that project's context, search roots, and review Inbox, choose only a project whose configured scope is appropriate for that trust boundary.
+
 `AGENT_MARKDOWN_LINK_CONFIG` may override the default with an absolute path. From a source checkout, verify a config with the workspace-local executable:
 
 ```text

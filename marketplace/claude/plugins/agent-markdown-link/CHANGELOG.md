@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 - 2026-07-20
+
+- Add an explicit default-project fallback so Claude Desktop Cowork can use the same configured local vault when its workspace path cannot match a host mapping.
+
 ## 0.2.1 - 2026-07-20
 
 - Fix Claude Desktop Cowork marketplace validation by using a compatible startup reminder to load context through the bundled local MCP connector.

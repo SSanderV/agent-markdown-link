@@ -118,6 +118,9 @@ export function validateConfig(value: unknown): ValidatedConfig {
     projectIds.add(project.projectId);
     return applyProjectDefaults(project, limits, seenRoots);
   });
+  if (config.defaultProjectId !== undefined && !projectIds.has(config.defaultProjectId)) {
+    invalidConfig();
+  }
 
   return {
     ...config,

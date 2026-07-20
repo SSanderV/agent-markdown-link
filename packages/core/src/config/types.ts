@@ -47,6 +47,7 @@ export interface AgentMarkdownConfigV1 {
   readonly captureMode: CaptureMode;
   readonly writeMode?: WriteMode;
   readonly hookPolicy?: HookPolicy;
+  readonly defaultProjectId?: string;
   readonly limits?: Partial<ConfigLimits>;
   readonly contextExclusions?: readonly string[];
   readonly projects: readonly ProjectMapping[];

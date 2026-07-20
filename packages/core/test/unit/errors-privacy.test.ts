@@ -32,6 +32,7 @@ describe("sanitized errors and token redaction", () => {
 
   it.each([
     ["E_INPUT_INVALID", "Input is invalid."],
+    ["E_PROJECT_UNMAPPED", "No project is mapped for this session."],
     ["E_CAPTURE_DISABLED", "Candidate capture is disabled."],
   ] as const)("provides the fixed %s diagnostic", (code, message) => {
     expect(toSanitizedDiagnostic(new AgentMarkdownError(code, { cause: new Error(canary) }))).toEqual({

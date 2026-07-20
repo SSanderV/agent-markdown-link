@@ -4,6 +4,7 @@
   "inboxPath": "Inbox/Agent Markdown Link",
   "captureMode": "explicit",
   "writeMode": "inbox",
+  "defaultProjectId": "project-a",
   "projects": [
     {
       "projectId": "project-a",

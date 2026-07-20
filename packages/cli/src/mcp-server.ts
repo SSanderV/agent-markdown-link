@@ -45,10 +45,6 @@ function errorResult(error: unknown) {
   return { ...text(JSON.stringify(toSanitizedDiagnostic(error))), isError: true };
 }
 
-function invalidInput(): never {
-  throw new AgentMarkdownError("E_INPUT_INVALID");
-}
-
 function hookOutput(hookEventName: HookEventName, additionalContext: string): string {
   return JSON.stringify({
     hookSpecificOutput: {
@@ -85,19 +81,28 @@ function boundedStdin(): Transform {
 
 async function configuredProject(
   environment: McpEnvironment,
-): Promise<{ readonly config: ResolvedConfig; readonly project: ResolvedProject | undefined }> {
-  const workspaceRoot = environment.env.CLAUDE_PROJECT_DIR;
-  if (workspaceRoot === undefined || !isAbsoluteLocalPath(workspaceRoot)) invalidInput();
-  const config = await loadConfig({ env: environment.env });
-  const project = await selectProject(config, workspaceRoot);
-  return { config, project };
-}
-
-async function mappedProject(
-  environment: McpEnvironment,
 ): Promise<{ readonly config: ResolvedConfig; readonly project: ResolvedProject }> {
-  const { config, project } = await configuredProject(environment);
-  if (project === undefined) invalidInput();
+  const config = await loadConfig({ env: environment.env });
+  const workspaceRoot = environment.env.CLAUDE_PROJECT_DIR;
+  const mappedProject =
+    workspaceRoot !== undefined && isAbsoluteLocalPath(workspaceRoot)
+      ? await selectProject(config, workspaceRoot)
+      : undefined;
+  if (mappedProject !== undefined) return { config, project: mappedProject };
+
+  const defaultProject = config.projects.find(
+    (project) => project.projectId === config.defaultProjectId,
+  );
+  const defaultWorkspaceRoot = defaultProject?.workspaceRoots[0];
+  if (defaultProject === undefined || defaultWorkspaceRoot === undefined) {
+    throw new AgentMarkdownError("E_PROJECT_UNMAPPED");
+  }
+
+  const project: ResolvedProject = {
+    ...defaultProject,
+    workspaceRoot: defaultWorkspaceRoot,
+    limits: { ...config.limits, ...defaultProject.limits },
+  };
   return { config, project };
 }
 
@@ -105,7 +110,7 @@ export function createMcpServer(
   environment: McpEnvironment = { env: process.env },
 ): McpServer {
   const deliveredSessions = new Set<string>();
-  const server = new McpServer({ name: "agent-markdown-link", version: "0.2.1" });
+  const server = new McpServer({ name: "agent-markdown-link", version: "0.2.2" });
 
   server.registerTool(
     "context",
@@ -134,10 +139,6 @@ export function createMcpServer(
 
       try {
         const { config, project } = await configuredProject(environment);
-        if (project === undefined) {
-          if (sessionId !== undefined) deliveredSessions.add(sessionId);
-          return text("");
-        }
         const context = await assembleContext(
           {
             ...config,
@@ -176,7 +177,7 @@ export function createMcpServer(
     },
     async ({ query }) => {
       try {
-        const { config, project } = await mappedProject(environment);
+        const { config, project } = await configuredProject(environment);
         const request = parseSearchRequest({ schemaVersion: 1, query });
         return text(JSON.stringify(await searchMarkdown(config, project, request)));
       } catch (error) {
@@ -207,7 +208,7 @@ export function createMcpServer(
     },
     async ({ kind, title, proposedKnowledge, rationale, evidence }) => {
       try {
-        const { config, project } = await mappedProject(environment);
+        const { config, project } = await configuredProject(environment);
         const request = parseCandidateRequest({
           schemaVersion: 1,
           sourceHost: "claude",

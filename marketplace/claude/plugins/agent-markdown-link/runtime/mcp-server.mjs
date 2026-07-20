@@ -42858,6 +42858,7 @@ var STABLE_ERROR_CODES = [
   "E_CONFIG_INVALID",
   "E_CONFIG_VERSION",
   "E_PROJECT_AMBIGUOUS",
+  "E_PROJECT_UNMAPPED",
   "E_PATH_UNSAFE",
   "E_PATH_ESCAPE",
   "E_INPUT_INVALID",
@@ -42876,6 +42877,7 @@ var SAFE_MESSAGES = {
   E_CONFIG_INVALID: "Configuration is invalid.",
   E_CONFIG_VERSION: "Configuration schema version is unsupported.",
   E_PROJECT_AMBIGUOUS: "Project mapping is ambiguous.",
+  E_PROJECT_UNMAPPED: "No project is mapped for this session.",
   E_PATH_UNSAFE: "Path is unsafe.",
   E_PATH_ESCAPE: "Path escapes its configured root.",
   E_INPUT_INVALID: "Input is invalid.",
@@ -43824,6 +43826,12 @@ var config_schema_default = {
     captureMode: { enum: ["disabled", "explicit"] },
     writeMode: { enum: ["outbox", "inbox"] },
     hookPolicy: { enum: ["observe", "warn", "enforce"] },
+    defaultProjectId: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      pattern: "^[a-z0-9][a-z0-9._-]{0,63}$"
+    },
     limits: { $ref: "#/definitions/limits" },
     contextExclusions: {
       type: "array",
@@ -44021,6 +44029,9 @@ function validateConfig(value) {
     projectIds.add(project.projectId);
     return applyProjectDefaults(project, limits, seenRoots);
   });
+  if (config2.defaultProjectId !== void 0 && !projectIds.has(config2.defaultProjectId)) {
+    invalidConfig();
+  }
   return {
     ...config2,
     vaultRoot: normalizeAbsoluteLocalPath(config2.vaultRoot),
@@ -44140,9 +44151,6 @@ function text(textValue) {
 function errorResult(error51) {
   return { ...text(JSON.stringify(toSanitizedDiagnostic(error51))), isError: true };
 }
-function invalidInput3() {
-  throw new AgentMarkdownError("E_INPUT_INVALID");
-}
 function hookOutput(hookEventName, additionalContext) {
   return JSON.stringify({
     hookSpecificOutput: {
@@ -44177,22 +44185,26 @@ function boundedStdin() {
   });
 }
 async function configuredProject(environment2) {
-  const workspaceRoot = environment2.env.CLAUDE_PROJECT_DIR;
-  if (workspaceRoot === void 0 || !isAbsoluteLocalPath(workspaceRoot))
-    invalidInput3();
   const config2 = await loadConfig({ env: environment2.env });
-  const project = await selectProject(config2, workspaceRoot);
-  return { config: config2, project };
-}
-async function mappedProject(environment2) {
-  const { config: config2, project } = await configuredProject(environment2);
-  if (project === void 0)
-    invalidInput3();
+  const workspaceRoot = environment2.env.CLAUDE_PROJECT_DIR;
+  const mappedProject = workspaceRoot !== void 0 && isAbsoluteLocalPath(workspaceRoot) ? await selectProject(config2, workspaceRoot) : void 0;
+  if (mappedProject !== void 0)
+    return { config: config2, project: mappedProject };
+  const defaultProject = config2.projects.find((project2) => project2.projectId === config2.defaultProjectId);
+  const defaultWorkspaceRoot = defaultProject?.workspaceRoots[0];
+  if (defaultProject === void 0 || defaultWorkspaceRoot === void 0) {
+    throw new AgentMarkdownError("E_PROJECT_UNMAPPED");
+  }
+  const project = {
+    ...defaultProject,
+    workspaceRoot: defaultWorkspaceRoot,
+    limits: { ...config2.limits, ...defaultProject.limits }
+  };
   return { config: config2, project };
 }
 function createMcpServer(environment2 = { env: process.env }) {
   const deliveredSessions = /* @__PURE__ */ new Set();
-  const server = new McpServer({ name: "agent-markdown-link", version: "0.2.1" });
+  const server = new McpServer({ name: "agent-markdown-link", version: "0.2.2" });
   server.registerTool("context", {
     description: "Read curated Markdown context for the configured local project.",
     inputSchema: external_exports.object({
@@ -44210,11 +44222,6 @@ function createMcpServer(environment2 = { env: process.env }) {
       return text("");
     try {
       const { config: config2, project } = await configuredProject(environment2);
-      if (project === void 0) {
-        if (sessionId !== void 0)
-          deliveredSessions.add(sessionId);
-        return text("");
-      }
       const context = await assembleContext({
         ...config2,
         limits: {
@@ -44244,7 +44251,7 @@ function createMcpServer(environment2 = { env: process.env }) {
     }
   }, async ({ query }) => {
     try {
-      const { config: config2, project } = await mappedProject(environment2);
+      const { config: config2, project } = await configuredProject(environment2);
       const request = parseSearchRequest({ schemaVersion: 1, query });
       return text(JSON.stringify(await searchMarkdown(config2, project, request)));
     } catch (error51) {
@@ -44268,7 +44275,7 @@ function createMcpServer(environment2 = { env: process.env }) {
     }
   }, async ({ kind, title, proposedKnowledge, rationale, evidence }) => {
     try {
-      const { config: config2, project } = await mappedProject(environment2);
+      const { config: config2, project } = await configuredProject(environment2);
       const request = parseCandidateRequest({
         schemaVersion: 1,
         sourceHost: "claude",

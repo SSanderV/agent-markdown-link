@@ -237,16 +237,99 @@ it("returns only fixed diagnostics when host configuration is unavailable", asyn
   }
 });
 
-it("contributes no startup context for a valid but unmapped workspace", async () => {
+it("uses an explicit default project against the same vault when the workspace is unmapped", async () => {
+  await expect(access(runtime)).resolves.toBeUndefined();
+
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "agent-markdown-mcp-default-")));
+  temporaryRoots.push(root);
+  const vault = path.join(root, "vault");
+  const memory = path.join(vault, "Memory");
+  const inbox = path.join(vault, "Inbox");
+  const mappedWorkspace = path.join(root, "mapped");
+  const unmappedWorkspace = path.join(root, "unmapped");
+  await mkdir(memory, { recursive: true });
+  await mkdir(inbox);
+  await mkdir(mappedWorkspace);
+  await mkdir(unmappedWorkspace);
+  await writeFile(path.join(memory, "Shared.md"), "Same configured vault canary.\n", "utf8");
+  const configPath = path.join(root, "config.json");
+  await writeFile(
+    configPath,
+    `${JSON.stringify({
+      schemaVersion: 1,
+      vaultRoot: vault,
+      inboxPath: "Inbox",
+      captureMode: "explicit",
+      writeMode: "inbox",
+      defaultProjectId: "mapped-only",
+      projects: [
+        {
+          projectId: "mapped-only",
+          workspaceRoots: [mappedWorkspace],
+          contextFiles: ["Memory/Shared.md"],
+          searchRoots: ["Memory"],
+        },
+      ],
+    })}\n`,
+    "utf8",
+  );
+
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [runtime],
+    cwd: unmappedWorkspace,
+    env: stringEnvironment({
+      ...process.env,
+      AGENT_MARKDOWN_LINK_CONFIG: configPath,
+      CLAUDE_PROJECT_DIR: unmappedWorkspace,
+    }),
+    stderr: "pipe",
+  });
+  const client = new Client({ name: "agent-markdown-link-test", version: "1.0.0" });
+
+  try {
+    await client.connect(transport);
+    const context = await client.callTool({
+      name: "context",
+      arguments: {},
+    });
+    expect(context.isError).not.toBe(true);
+    expect(textContent(context)).toContain("Same configured vault canary.");
+
+    const search = await client.callTool({
+      name: "search",
+      arguments: { query: "configured vault canary" },
+    });
+    expect(search.isError).not.toBe(true);
+    expect(JSON.parse(textContent(search))).toMatchObject({
+      results: [{ relativePath: "Memory/Shared.md" }],
+    });
+
+    const capture = await client.callTool({
+      name: "capture",
+      arguments: {
+        kind: "fact",
+        title: "Cowork reaches the configured vault",
+        proposedKnowledge: "An unmapped Cowork session used the explicit default project.",
+      },
+    });
+    expect(capture.isError).not.toBe(true);
+    expect(JSON.parse(textContent(capture))).toMatchObject({ projectId: "mapped-only" });
+    expect(await readdir(inbox)).toHaveLength(1);
+  } finally {
+    await client.close();
+  }
+});
+
+it("fails closed with a distinct error when an unmapped workspace has no default project", async () => {
   await expect(access(runtime)).resolves.toBeUndefined();
 
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "agent-markdown-mcp-unmapped-")));
   temporaryRoots.push(root);
   const vault = path.join(root, "vault");
-  const inbox = path.join(vault, "Inbox");
   const mappedWorkspace = path.join(root, "mapped");
   const unmappedWorkspace = path.join(root, "unmapped");
-  await mkdir(inbox, { recursive: true });
+  await mkdir(vault);
   await mkdir(mappedWorkspace);
   await mkdir(unmappedWorkspace);
   const configPath = path.join(root, "config.json");
@@ -283,11 +366,11 @@ it("contributes no startup context for a valid but unmapped workspace", async ()
 
   try {
     await client.connect(transport);
-    const context = await client.callTool({
-      name: "context",
-      arguments: { hookEventName: "SessionStart", sessionId: "unmapped-session" },
-    });
-    expect(textContent(context)).toBe("");
+    const context = await client.callTool({ name: "context", arguments: {} });
+    expect(context.isError).toBe(true);
+    expect(textContent(context)).toBe(
+      '{"code":"E_PROJECT_UNMAPPED","message":"No project is mapped for this session."}',
+    );
   } finally {
     await client.close();
   }
