@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-07-20
 
 - Add a guided, no-overwrite `init` command for local configuration.
 - Simplify the Claude MCP `context` tool to its intended empty input object.

@@ -95,7 +95,7 @@ async function configuredProject(
 export function createMcpServer(
   environment: McpEnvironment = { env: process.env },
 ): McpServer {
-  const server = new McpServer({ name: "agent-markdown-link", version: "0.2.2" });
+  const server = new McpServer({ name: "agent-markdown-link", version: "0.3.0" });
 
   server.registerTool(
     "context",
