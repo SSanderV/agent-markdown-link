@@ -1,6 +1,6 @@
 # Agent Markdown Link
 
-Agent Markdown Link is a local-only Codex and Claude plugin plus CLI for explicitly curated, Obsidian-compatible Markdown. It loads chosen context, offers bounded lexical search, and writes reviewable candidate notes to an Inbox. It never edits canonical notes.
+Agent Markdown Link is a local-only Codex, Claude Code, and Claude Desktop Cowork plugin plus CLI for explicitly curated, Obsidian-compatible Markdown. It loads chosen context, offers bounded lexical search, and writes reviewable candidate notes to an Inbox. It never edits canonical notes.
 
 Obsidian is optional: it can be a convenient editor and review surface, but does not need to be open or installed while Agent Markdown Link runs. This independent project is not affiliated with Obsidian, OpenAI, or Anthropic.
 
@@ -26,6 +26,8 @@ Full configuration, upgrade, uninstall, and rollback instructions are in [INSTAL
 4. An agent may explicitly submit one candidate for human review; you edit, promote, or reject it yourself.
 
 The runtime has no automatic network, Git, Obsidian, sync, canonical-edit, delete, or promotion action. An unmapped workspace contributes no context. A loading error returns a fixed unavailable notice without blocking the host session.
+
+Claude uses a bundled local stdio MCP server, so desktop Cowork can reach the same host configuration and vault as Claude Code. Cowork sessions without the Claude Desktop local bridge are not supported.
 
 ## CLI
 

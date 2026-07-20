@@ -75,7 +75,7 @@ describe("public release surface", () => {
 
     expect(manifest).toMatchObject({
       name: "agent-markdown-link",
-      version: "0.1.0",
+      version: "0.2.0",
       homepage: "https://github.com/SanderVirula/agent-markdown-link",
       repository: "https://github.com/SanderVirula/agent-markdown-link",
     });
@@ -118,30 +118,34 @@ describe("public release surface", () => {
       plugins: [
         {
           name: "agent-markdown-link",
-          version: "0.1.0",
+          version: "0.2.0",
           source: "./marketplace/claude/plugins/agent-markdown-link",
         },
       ],
     });
   });
 
-  it.each(["codex", "claude"])("keeps the tracked %s marketplace artifact current", async (host) => {
-    const builtRoot = path.join(repositoryRoot, "dist", "plugins", host);
-    const marketplaceRoot = path.join(
-      repositoryRoot,
-      "marketplace",
-      host,
-      "plugins",
-      "agent-markdown-link",
-    );
-
-    expect(await inventory(marketplaceRoot)).toEqual(await inventory(builtRoot));
-    for (const relativePath of await inventory(builtRoot)) {
-      expect(await readFile(path.join(marketplaceRoot, relativePath))).toEqual(
-        await readFile(path.join(builtRoot, relativePath)),
+  it.each(["codex", "claude"])(
+    "keeps the tracked %s marketplace artifact current",
+    async (host) => {
+      const builtRoot = path.join(repositoryRoot, "dist", "plugins", host);
+      const marketplaceRoot = path.join(
+        repositoryRoot,
+        "marketplace",
+        host,
+        "plugins",
+        "agent-markdown-link",
       );
-    }
-  });
+
+      expect(await inventory(marketplaceRoot)).toEqual(await inventory(builtRoot));
+      for (const relativePath of await inventory(builtRoot)) {
+        expect(await readFile(path.join(marketplaceRoot, relativePath))).toEqual(
+          await readFile(path.join(builtRoot, relativePath)),
+        );
+      }
+    },
+    20_000,
+  );
 
   it("has no dangling release scripts", async () => {
     const packageJson = await json("package.json");

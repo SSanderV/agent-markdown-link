@@ -6,11 +6,11 @@ Agent Markdown Link is a local file tool. It is designed to reduce accidental di
 
 Use [GitHub private vulnerability reporting](https://github.com/SanderVirula/agent-markdown-link/security/advisories/new) for security issues. Do not include real vault contents, credentials, or other personal data. General bugs belong in the public issue tracker.
 
-Security fixes are provided for the current `0.1.x` release line while it remains supported. Pre-release snapshots and modified forks are not supported by the maintainer.
+Security fixes are provided for the current `0.2.x` release line while it remains supported. Pre-release snapshots and modified forks are not supported by the maintainer.
 
 ## Runtime guarantees
 
-- Normal CLI operation performs no network, Git, shell, child-process, telemetry, or Obsidian activity.
+- Normal CLI and stdio MCP operation performs no network, Git, shell, child-process, telemetry, or Obsidian activity.
 - Context reads are limited to configured vault-relative regular files. Lexical validation and real-path checks reject traversal and linked paths outside the vault.
 - Search recursively reads regular Markdown files only below the selected project's configured vault-relative `searchRoots`. It skips discovered links, never writes an index or cache, and applies fixed scan, source, result, excerpt, and output bounds.
 - Candidate publication uses a same-directory private temporary file and a no-replace hard link. An existing destination is never overwritten, and there is no copy or rename fallback.
@@ -18,9 +18,11 @@ Security fixes are provided for the current `0.1.x` release line while it remain
 - Queries, note bodies, excerpts, candidate bodies, prompts, credentials, absolute paths, and session data are not written to logs or metrics.
 - Created directories and files request modes `0700` and `0600` on POSIX. Windows uses inherited ACLs and makes no ACL-rewrite claim.
 
-The `SessionStart` hook reads one bounded JSON object and operationally uses only its event name, source, and working directory. Extra host fields are ignored; the runtime does not read transcripts. Successful curated context is capped at 9,000 UTF-8 bytes, and serialized hook stdout is capped at 32,768 bytes.
+The Codex `SessionStart` hook reads one bounded JSON object and operationally uses only its event name, source, and working directory. Extra host fields are ignored; the runtime does not read transcripts. Successful curated context is capped at 9,000 UTF-8 bytes, and serialized hook stdout is capped at 32,768 bytes.
 
-An unmapped workspace exits successfully without output. Every other hook failure also exits successfully, injects only the fixed context-unavailable notice, and writes a sanitized diagnostic to stderr. Context assembly is all-or-nothing, so a later file failure does not expose earlier file content.
+The Claude plugin starts one local stdio MCP server with only `context`, `search`, and `capture` tools. Each protocol frame is capped at 2 MiB. The server selects a project only from the host-supplied `CLAUDE_PROJECT_DIR`; tool input cannot select a config, vault, or workspace path, and capture fixes `sourceHost` to `claude`. A `UserPromptSubmit` hook supplies context once if MCP was not connected for `SessionStart`, and the server suppresses duplicate delivery for the same session.
+
+An unmapped workspace contributes no context. Every other context-hook failure is non-blocking and injects only the fixed context-unavailable notice. MCP search and capture failures return only a stable code and fixed message. Context assembly is all-or-nothing, so a later file failure does not expose earlier file content.
 
 ## Operator responsibilities
 

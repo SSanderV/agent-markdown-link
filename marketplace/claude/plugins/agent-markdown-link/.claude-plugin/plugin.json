@@ -1,7 +1,7 @@
 {
   "name": "agent-markdown-link",
   "displayName": "Agent Markdown Link",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Loads curated local Markdown context and captures review candidates.",
   "author": {
     "name": "Sander",

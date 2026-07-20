@@ -16,6 +16,8 @@ claude plugin install agent-markdown-link@agent-markdown-link
 
 Review and trust any host hook prompt before enabling it. Start a new host session after installation.
 
+For Cowork, install and enable the plugin in Claude Desktop. The bundled MCP server runs locally through Desktop and reads the normal host configuration; no configuration or vault copy belongs inside the Cowork sandbox. Cowork sessions without the Desktop local bridge cannot access the local vault.
+
 ## Configure
 
 Create a config file using [the synthetic example](reference/example-config.json). Replace every example path with your own local paths; vault-relative paths use `/`.

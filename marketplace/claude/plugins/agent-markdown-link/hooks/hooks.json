@@ -6,11 +6,29 @@
         "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
-            "type": "command",
-            "command": "node",
-            "args": [
-              "${CLAUDE_PLUGIN_ROOT}/runtime/session-start.mjs"
-            ],
+            "type": "mcp_tool",
+            "server": "plugin:agent-markdown-link:memory",
+            "tool": "context",
+            "input": {
+              "hookEventName": "SessionStart",
+              "sessionId": "${session_id}"
+            },
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:agent-markdown-link:memory",
+            "tool": "context",
+            "input": {
+              "hookEventName": "UserPromptSubmit",
+              "sessionId": "${session_id}"
+            },
             "timeout": 10
           }
         ]

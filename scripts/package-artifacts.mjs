@@ -1,4 +1,4 @@
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,23 +42,40 @@ for (const host of ["codex", "claude"]) {
     path.join(artifact, "docs", "reference", "example-config.json"),
   );
 
+  const runtimeEntry =
+    host === "claude"
+      ? {
+          "runtime/mcp-server": path.join(
+            root,
+            "packages",
+            "cli",
+            "dist",
+            "mcp-entry.js",
+          ),
+        }
+      : {
+          "runtime/session-start": path.join(
+            root,
+            "packages",
+            "cli",
+            "dist",
+            "session-start-entry.js",
+          ),
+        };
+
+  const entryPoints = {
+    ...runtimeEntry,
+    "skills/agent-markdown-link/scripts/agent-markdown": path.join(
+      root,
+      "packages",
+      "cli",
+      "dist",
+      "index.js",
+    ),
+  };
+
   await build({
-    entryPoints: {
-      "runtime/session-start": path.join(
-        root,
-        "packages",
-        "cli",
-        "dist",
-        "session-start-entry.js",
-      ),
-      "skills/agent-markdown-link/scripts/agent-markdown": path.join(
-        root,
-        "packages",
-        "cli",
-        "dist",
-        "index.js",
-      ),
-    },
+    entryPoints,
     outdir: artifact,
     outExtension: { ".js": ".mjs" },
     bundle: true,
@@ -68,6 +85,15 @@ for (const host of ["codex", "claude"]) {
     sourcemap: false,
     logLevel: "silent",
   });
+
+  for (const output of Object.keys(entryPoints)) {
+    const outputPath = path.join(artifact, `${output}.mjs`);
+    const bundled = await readFile(outputPath, "utf8");
+    const normalized = bundled.replace(/[ \t]+(?=\r?$)/gm, "");
+    if (normalized !== bundled) {
+      await writeFile(outputPath, normalized, "utf8");
+    }
+  }
 
   const marketplaceArtifact = path.join(
     marketplaceRoot,

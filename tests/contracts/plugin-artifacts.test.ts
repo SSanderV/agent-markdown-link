@@ -33,6 +33,7 @@ const expectedFiles = {
   ],
   claude: [
     ".claude-plugin/plugin.json",
+    ".mcp.json",
     "CHANGELOG.md",
     "LICENSE",
     "PRIVACY.md",
@@ -47,7 +48,7 @@ const expectedFiles = {
     "docs/INSTALL.md",
     "docs/reference/example-config.json",
     "hooks/hooks.json",
-    "runtime/session-start.mjs",
+    "runtime/mcp-server.mjs",
     "skills/agent-markdown-link/SKILL.md",
     "skills/agent-markdown-link/scripts/agent-markdown.env",
     "skills/agent-markdown-link/scripts/agent-markdown.mjs",
@@ -96,7 +97,7 @@ describe.each(["codex", "claude"] as const)("%s plugin artifact", (host) => {
     const skill = await readFile(sourceSkill, "utf8");
     expect(skill).toContain("--env-file=");
     expect(skill).toContain("separate single arguments");
-    expect(skill).toContain("path contains spaces");
+    expect(skill).toMatch(/paths?.*contain spaces/iu);
   });
 
   it("loads the packaged search environment from a path containing spaces", async () => {
@@ -138,32 +139,67 @@ describe.each(["codex", "claude"] as const)("%s plugin artifact", (host) => {
     expect(helper).toContain("SEARCH_REQUEST_BYTES");
   });
 
-  it("registers only SessionStart using a plugin-root runtime", async () => {
+  it("registers local startup context using a plugin-root runtime", async () => {
     const hooks = await json(path.join(root, "hooks", "hooks.json"));
     const registrations = hooks.hooks as Record<
       string,
       readonly { readonly hooks: readonly Record<string, unknown>[] }[]
     >;
-    expect(Object.keys(registrations)).toEqual(["SessionStart"]);
-    const commandHook = registrations.SessionStart?.[0]?.hooks[0];
-    expect(commandHook).toBeDefined();
-
     if (host === "codex") {
+      expect(Object.keys(registrations)).toEqual(["SessionStart"]);
+      const commandHook = registrations.SessionStart?.[0]?.hooks[0];
       expect(commandHook).toMatchObject({
         command: 'node "${PLUGIN_ROOT}/runtime/session-start.mjs"',
         commandWindows: 'node "${PLUGIN_ROOT}\\runtime\\session-start.mjs"',
       });
     } else {
-      expect(commandHook).toMatchObject({
-        command: "node",
-        args: ["${CLAUDE_PLUGIN_ROOT}/runtime/session-start.mjs"],
+      expect(Object.keys(registrations)).toEqual(["SessionStart", "UserPromptSubmit"]);
+      expect(registrations.SessionStart?.[0]?.hooks[0]).toMatchObject({
+        type: "mcp_tool",
+        server: "plugin:agent-markdown-link:memory",
+        tool: "context",
+        input: {
+          hookEventName: "SessionStart",
+          sessionId: "${session_id}",
+        },
+      });
+      expect(registrations.UserPromptSubmit?.[0]?.hooks[0]).toMatchObject({
+        type: "mcp_tool",
+        server: "plugin:agent-markdown-link:memory",
+        tool: "context",
+        input: {
+          hookEventName: "UserPromptSubmit",
+          sessionId: "${session_id}",
+        },
+      });
+
+      const mcp = await json(path.join(root, ".mcp.json"));
+      expect(mcp).toEqual({
+        mcpServers: {
+          memory: {
+            command: "node",
+            args: ["${CLAUDE_PLUGIN_ROOT}/runtime/mcp-server.mjs"],
+            env: { UV_THREADPOOL_SIZE: "16" },
+          },
+        },
       });
     }
 
     const serialized = JSON.stringify(hooks);
-    expect(serialized).toContain(host === "codex" ? "PLUGIN_ROOT" : "CLAUDE_PLUGIN_ROOT");
-    expect(serialized).not.toMatch(/\bagent-markdown(?:\.cmd)?\b/u);
+    if (host === "codex") {
+      expect(serialized).toContain("PLUGIN_ROOT");
+      expect(serialized).not.toMatch(/\bagent-markdown(?:\.cmd)?\b/u);
+    }
   });
+
+  if (host === "claude") {
+    it("keeps the packaged MCP runtime local-only", async () => {
+      const runtime = await readFile(path.join(root, "runtime", "mcp-server.mjs"), "utf8");
+      expect(runtime).not.toMatch(
+        /(?:from\s+|import\s*)["'](?:node:)?(?:child_process|https?|http2|net|tls|dgram|dns|undici)["']/u,
+      );
+    });
+  }
 });
 
 it("uses the minimal valid Codex manifest", async () => {
@@ -173,7 +209,7 @@ it("uses the minimal valid Codex manifest", async () => {
 
   expect(manifest).toMatchObject({
     name: "agent-markdown-link",
-    version: "0.1.0",
+    version: "0.2.0",
     license: "Apache-2.0",
     skills: "./skills/",
   });
@@ -189,6 +225,6 @@ it("uses the minimal Claude manifest", async () => {
 
   expect(manifest).toMatchObject({
     name: "agent-markdown-link",
-    version: "0.1.0",
+    version: "0.2.0",
   });
 });

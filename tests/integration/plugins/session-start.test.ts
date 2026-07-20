@@ -62,7 +62,7 @@ async function hash(filePath: string): Promise<string> {
   return createHash("sha256").update(await readFile(filePath)).digest("hex");
 }
 
-describe.each(["codex", "claude"] as const)("relocated %s plugin", (host) => {
+describe.each(["codex"] as const)("relocated %s plugin", (host) => {
   it("loads curated context and creates only a review candidate", async () => {
     const root = await realpath(await mkdtemp(path.join(tmpdir(), "agent-markdown-plugin-")));
     temporaryRoots.push(root);
