@@ -60,6 +60,7 @@ describe("public release surface", () => {
     const readme = await readFile(path.join(repositoryRoot, "README.md"), "utf8");
     const install = await readFile(path.join(repositoryRoot, "docs", "INSTALL.md"), "utf8");
 
+    expect(readme).toContain('<img src="assets/logo.svg"');
     expect(readme).toContain("codex plugin marketplace add SSanderV/agent-markdown-link");
     expect(readme).toContain("claude plugin marketplace add SSanderV/agent-markdown-link");
     expect(install).toContain("%APPDATA%\\agent-markdown-link\\config.json");

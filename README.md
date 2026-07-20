@@ -1,61 +1,92 @@
-# Agent Markdown Link
+<p align="center">
+  <img src="assets/logo.svg" width="112" alt="Agent Markdown Link logo">
+</p>
 
-Agent Markdown Link is a local-only Codex, Claude Code, and Claude Desktop Cowork plugin plus CLI for explicitly curated, Obsidian-compatible Markdown. It loads chosen context, offers bounded lexical search, and writes reviewable candidate notes to an Inbox. It never edits canonical notes.
+<h1 align="center">Agent Markdown Link</h1>
 
-Obsidian is optional: it can be a convenient editor and review surface, but does not need to be open or installed while Agent Markdown Link runs. This independent project is not affiliated with Obsidian, OpenAI, or Anthropic.
+<p align="center">
+  Curated local Markdown memory for Codex, Claude Code, and Claude Desktop Cowork.
+</p>
+
+Agent Markdown Link connects AI agents to explicitly chosen, Obsidian-compatible Markdown notes. It loads curated startup context, offers bounded lexical search when more recall is needed, and submits new memory candidates to a review Inbox. It never edits canonical notes.
+
+Obsidian is optional. It is a convenient editor and review surface, but Agent Markdown Link works while Obsidian is closed or not installed.
 
 ## Install
 
-Node.js 22 or newer is required. Add this marketplace to the host you use:
+Node.js 22 or newer is required.
 
 ```text
+# Codex
 codex plugin marketplace add SSanderV/agent-markdown-link
 codex plugin add agent-markdown-link@agent-markdown-link
 
+# Claude Code or Claude Desktop
 claude plugin marketplace add SSanderV/agent-markdown-link
 claude plugin install agent-markdown-link@agent-markdown-link
 ```
 
-Full configuration, upgrade, uninstall, and rollback instructions are in [INSTALL](docs/INSTALL.md).
+Review any host hook prompt, then start a new session after installation.
 
-After installation, ask your agent to **initialize Agent Markdown Link for this workspace**. The bundled skill will give you the exact local command for the guided `init` wizard, which validates your choices and refuses to replace an existing configuration.
+## Set up
 
-## How it works
+Ask your agent:
 
-1. You configure a local Markdown vault, candidate Inbox, and one or more workspace mappings. An optional default project supports hosts such as Cowork whose workspace path cannot match the host path.
-2. At session start, Codex supplies ordered context directly; Claude loads it through the bundled local connector before answering.
-3. An agent may run a bounded lexical search only when the supplied context is insufficient.
-4. An agent may explicitly submit one candidate for human review; you edit, promote, or reject it yourself.
+> Initialize Agent Markdown Link for this workspace.
 
-The runtime has no automatic network, Git, Obsidian, sync, canonical-edit, delete, or promotion action. An unmapped workspace contributes no context unless `defaultProjectId` explicitly selects one configured project. Loading errors are sanitized and do not block the host session.
+The bundled skill locates the guided `init` wizard. You choose the vault, workspace mapping, context files, search roots, review Inbox, and whether that project should be available to unmapped Cowork sessions. The wizard validates the configuration, writes only the local config file, and refuses to overwrite an existing one.
 
-Claude uses a bundled local stdio MCP server, so desktop Cowork can reach the same host configuration and vault as Claude Code. Set `defaultProjectId` when Cowork's workspace path does not match a host workspace mapping. Cowork sessions without the Claude Desktop local bridge are not supported.
-
-## CLI
-
-From a source checkout, use the workspace-local CLI; global installation is not required.
+From a source checkout, run the wizard directly:
 
 ```text
 # macOS/Linux
 ./node_modules/.bin/agent-markdown init
-./node_modules/.bin/agent-markdown --config /absolute/path/to/config.json context
 
 # Windows PowerShell
 .\node_modules\.bin\agent-markdown.cmd init
-.\node_modules\.bin\agent-markdown.cmd --config C:\absolute\path\to\config.json context
 ```
 
-`init` interactively creates one local config and never overwrites an existing one. It does not create or edit vault content. `context` reads the configured files in order. `search` accepts one JSON query on standard input and searches only configured Markdown roots; results are lexical, bounded, and report truncation. `capture` accepts one JSON candidate and creates a relative Inbox path without returning submitted content or an absolute vault path. See [the synthetic configuration](docs/reference/example-config.json).
+See [Installation](docs/INSTALL.md) for configuration locations, manual setup, upgrades, rollback, and uninstall instructions.
 
-## Security and project links
+## How it works
 
-All configured files remain local plaintext. Protect the vault, device, backups, and any sync service. Hosts may retain or send an agent tool call according to their own policies; see [SECURITY.md](SECURITY.md) for the precise boundary.
+1. A project mapping selects ordered context files and optional search roots inside one local Markdown vault.
+2. Codex receives curated context at session start; Claude loads it through the bundled local connector.
+3. Agents search only the configured roots when startup context is insufficient.
+4. Agents can submit candidate notes to the review Inbox. You decide what to edit, promote, or reject.
 
+Claude Desktop uses a bundled local MCP server, allowing Cowork to reach the same host configuration and vault as Claude Code. Cowork sessions without the Desktop local bridge cannot access the local vault.
+
+## Safety boundaries
+
+- No automatic network, Git, Obsidian, sync, delete, or promotion activity.
+- No direct edits to canonical notes; writes are review candidates only.
+- Search, context, and candidate inputs and outputs are bounded.
+- Workspace mappings constrain access. Unmapped sessions fail closed unless you explicitly select a default project.
+- Errors are sanitized and do not block the host session.
+
+Vault files and configuration remain local plaintext. Protect the device, vault, backups, and any sync provider. Agent hosts may retain or transmit tool calls under their own policies; see [Security](SECURITY.md) and [Privacy](PRIVACY.md) for the precise boundary.
+
+## CLI
+
+| Command | Purpose |
+| --- | --- |
+| `init` | Interactively create a validated, no-overwrite configuration. |
+| `context` | Read configured context files in order. |
+| `search` | Search configured Markdown roots using one bounded JSON request on standard input. |
+| `capture` | Create one review candidate from a bounded JSON request on standard input. |
+
+Use `--config <absolute-path>` before a command to select a non-default configuration. See the [synthetic example configuration](docs/reference/example-config.json) for the JSON shape.
+
+## Project links
+
+- [Installation](docs/INSTALL.md)
+- [Security](SECURITY.md)
 - [Privacy](PRIVACY.md)
 - [Terms](TERMS.md)
 - [Support](SUPPORT.md)
-- [Third-party notices](THIRD_PARTY_NOTICES.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-Licensed under [Apache-2.0](LICENSE).
+Licensed under [Apache-2.0](LICENSE). This independent project is not affiliated with Obsidian, OpenAI, or Anthropic.
