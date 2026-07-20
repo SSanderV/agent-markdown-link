@@ -43035,6 +43035,17 @@ function addOmission(state, source) {
   state.detailBytes += bytes;
   state.details.push({ order: source.order, line });
 }
+function withOmission(state, source) {
+  const next = {
+    count: state.count,
+    totalBytes: state.totalBytes,
+    detailBytes: state.detailBytes,
+    detailOverflowed: state.detailOverflowed,
+    details: [...state.details]
+  };
+  addOmission(next, source);
+  return next;
+}
 function omissionNotice(state, detailed) {
   const heading = detailed ? `--- omitted sources: ${state.count} ---` : `--- omitted sources: ${state.count} bytes: ${state.totalBytes} ---`;
   const details = detailed ? `${[...state.details].sort((left, right) => left.order - right.order).map((detail) => detail.line).join("\n")}
@@ -43050,7 +43061,7 @@ async function assembleContext(config2, project) {
   if (warningBytes > outputLimit)
     throw new AgentMarkdownError("E_OUTPUT_LIMIT");
   const included = [];
-  const omitted = {
+  let omitted = {
     count: 0,
     totalBytes: 0,
     detailBytes: 0,
@@ -43084,9 +43095,9 @@ ${block}`;
       outputBytes += source.additionBytes;
       continue;
     }
-    addOmission(omitted, source);
+    let nextOmitted = withOmission(omitted, source);
     for (; ; ) {
-      const compactNoticeBytes = Buffer.byteLength(omissionNotice(omitted, false), "utf8");
+      const compactNoticeBytes = Buffer.byteLength(omissionNotice(nextOmitted, false), "utf8");
       if (outputBytes + compactNoticeBytes <= outputLimit)
         break;
       const removed = included.pop();
@@ -43095,7 +43106,16 @@ ${block}`;
       sourceBytes -= removed.byteLength;
       outputBytes -= removed.additionBytes;
       addOmission(omitted, removed);
+      nextOmitted = withOmission(omitted, source);
     }
+    const noticeWithoutCurrentBytes = omitted.count === 0 ? 0 : Buffer.byteLength(omissionNotice(omitted, false), "utf8");
+    if (sourceBytes + source.byteLength <= project.limits.contextTotalBytes && outputBytes + source.additionBytes + noticeWithoutCurrentBytes <= outputLimit) {
+      included.push(source);
+      sourceBytes += source.byteLength;
+      outputBytes += source.additionBytes;
+      continue;
+    }
+    omitted = nextOmitted;
   }
   let notice = "";
   if (omitted.count > 0) {

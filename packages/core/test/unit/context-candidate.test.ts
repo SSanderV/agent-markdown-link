@@ -181,6 +181,25 @@ describe("curated context", () => {
     expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(1_000);
   });
 
+  it("reconsiders a later source after the omission notice evicts an earlier source", async () => {
+    const root = await temporaryRoot();
+    const vault = await createVault(root);
+    const earlierBody = "a".repeat(240);
+    await writeFile(path.join(vault, "earlier.md"), earlierBody, "utf8");
+    await writeFile(path.join(vault, "later.md"), "b", "utf8");
+    const { config, project } = fixture(root, {
+      contextFiles: ["earlier.md", "later.md"],
+      limits: { hookOutputBytes: 500, contextFileBytes: 500, contextTotalBytes: 1_000 },
+    });
+
+    const text = await assembleContext(config, project);
+
+    expect(text).not.toContain(earlierBody);
+    expect(text).toContain('--- source: "later.md" bytes: 1 ---\nb');
+    expect(text).toContain('--- omitted sources: 1 ---\n"earlier.md" bytes: 240');
+    expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(500);
+  });
+
   it("keeps an earlier source when it fits with the actual omission notice", async () => {
     const root = await temporaryRoot();
     const vault = await createVault(root);

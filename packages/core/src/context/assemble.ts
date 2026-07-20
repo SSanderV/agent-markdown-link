@@ -76,6 +76,18 @@ function addOmission(state: OmissionState, source: ContextSource): void {
   state.details.push({ order: source.order, line });
 }
 
+function withOmission(state: OmissionState, source: ContextSource): OmissionState {
+  const next = {
+    count: state.count,
+    totalBytes: state.totalBytes,
+    detailBytes: state.detailBytes,
+    detailOverflowed: state.detailOverflowed,
+    details: [...state.details],
+  };
+  addOmission(next, source);
+  return next;
+}
+
 function omissionNotice(state: OmissionState, detailed: boolean): string {
   const heading = detailed
     ? `--- omitted sources: ${state.count} ---`
@@ -98,7 +110,7 @@ export async function assembleContext(
   if (warningBytes > outputLimit) throw new AgentMarkdownError("E_OUTPUT_LIMIT");
 
   const included: ContextSource[] = [];
-  const omitted: OmissionState = {
+  let omitted: OmissionState = {
     count: 0,
     totalBytes: 0,
     detailBytes: 0,
@@ -137,16 +149,32 @@ export async function assembleContext(
       continue;
     }
 
-    addOmission(omitted, source);
+    let nextOmitted = withOmission(omitted, source);
     for (;;) {
-      const compactNoticeBytes = Buffer.byteLength(omissionNotice(omitted, false), "utf8");
+      const compactNoticeBytes = Buffer.byteLength(omissionNotice(nextOmitted, false), "utf8");
       if (outputBytes + compactNoticeBytes <= outputLimit) break;
       const removed = included.pop();
       if (removed === undefined) throw new AgentMarkdownError("E_OUTPUT_LIMIT");
       sourceBytes -= removed.byteLength;
       outputBytes -= removed.additionBytes;
       addOmission(omitted, removed);
+      nextOmitted = withOmission(omitted, source);
     }
+
+    const noticeWithoutCurrentBytes =
+      omitted.count === 0
+        ? 0
+        : Buffer.byteLength(omissionNotice(omitted, false), "utf8");
+    if (
+      sourceBytes + source.byteLength <= project.limits.contextTotalBytes &&
+      outputBytes + source.additionBytes + noticeWithoutCurrentBytes <= outputLimit
+    ) {
+      included.push(source);
+      sourceBytes += source.byteLength;
+      outputBytes += source.additionBytes;
+      continue;
+    }
+    omitted = nextOmitted;
   }
 
   let notice = "";
